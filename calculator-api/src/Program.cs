@@ -7,6 +7,11 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Enable Application Insights
+builder.Services.AddApplicationInsightsTelemetry();
+
+builder.Services.AddSingleton(sp => { var kvUrl = builder.Configuration["KEYVAULT_URL"]; return new SecretClient(new Uri(kvUrl), new DefaultAzureCredential()); });
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())

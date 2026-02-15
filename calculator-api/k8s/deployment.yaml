@@ -4,7 +4,7 @@ metadata:
   name: webapi-deployment
   namespace: webapi
   annotations:
-    redeploy-timestamp: "2026-02-13-16-45"   # bump this to force rollout if needed
+    redeploy-timestamp: "2026-02-13-16-45"
 spec:
   replicas: 1
   selector:
@@ -15,6 +15,7 @@ spec:
       labels:
         app: webapi
     spec:
+      serviceAccountName: webapi-sa   # ⭐ REQUIRED for workload identity
       containers:
         - name: webapi
           image: srinivasacr.azurecr.io/webapi:latest
@@ -24,6 +25,15 @@ spec:
           env:
             - name: ASPNETCORE_ENVIRONMENT
               value: "Production"
+
+            # ⭐ Application Insights
+            - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+              value: "InstrumentationKey=0155f79d-0a38-4309-b47e-a66adcb5e194;IngestionEndpoint=https://centralus-2.in.applicationinsights.azure.com/;LiveEndpoint=https://centralus.livediagnostics.monitor.azure.com/;ApplicationId=a6d3689b-c822-490c-bf25-73fbe175d8f2"
+
+            # ⭐ Key Vault URL for DefaultAzureCredential
+            - name: KEYVAULT_URL
+              value: "https://srinivas-kv-01.vault.azure.net/"
+
           resources:
             requests:
               cpu: "100m"
