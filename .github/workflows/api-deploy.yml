@@ -44,7 +44,8 @@ jobs:
             --platform linux/amd64 \
             -t $REGISTRY/$IMAGE_NAME:latest \
             -f calculator-api/docker/Dockerfile \
-            --push .
+            calculator-api \
+            --push
 
   deploy-to-aks:
     needs: build-and-push
