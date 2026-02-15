@@ -3,11 +3,11 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 # Copy csproj and restore
-COPY ./src/ControllerApi.csproj .
+COPY src/ControllerApi.csproj .
 RUN dotnet restore ControllerApi.csproj
 
 # Copy the rest of the source code
-COPY ./src/ ./
+COPY src .
 
 # Publish
 RUN dotnet publish -c Release -o /publish
