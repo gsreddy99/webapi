@@ -1,0 +1,5 @@
+/bin/
+/obj/
+/.idea/
+/calculator-api/src/bin/
+/calculator-api/src/obj/

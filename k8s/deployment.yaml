@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapi-deployment
+  namespace: webapi
+  annotations:
+    redeploy-timestamp: "2026-02-13-16-45"   # bump this to force rollout if needed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webapi
+  template:
+    metadata:
+      labels:
+        app: webapi
+    spec:
+      containers:
+        - name: webapi
+          image: srinivasacr.azurecr.io/webapi:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      restartPolicy: Always

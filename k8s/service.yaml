@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapi-service
+  namespace: webapi
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 20.112.206.23
+  selector:
+    app: webapi
+  ports:
+    - port: 80
+      targetPort: 8080
