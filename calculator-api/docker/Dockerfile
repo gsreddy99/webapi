@@ -2,12 +2,12 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Copy csproj and restore
-COPY ../src/ControllerApi.csproj .
+# Copy csproj
+COPY ./src/ControllerApi.csproj ./
 RUN dotnet restore ControllerApi.csproj
 
-# Copy the rest of the source code
-COPY ../src .
+# Copy the rest of the source
+COPY src/. .
 
 # Publish
 RUN dotnet publish -c Release -o /publish
@@ -16,7 +16,6 @@ RUN dotnet publish -c Release -o /publish
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
 
-# Copy published output
 COPY --from=build /publish .
 
 EXPOSE 80

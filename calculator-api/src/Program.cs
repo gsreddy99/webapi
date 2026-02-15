@@ -1,3 +1,6 @@
+using Azure.Identity;
+using Azure.Security.KeyVault.Secrets;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Controllers
@@ -10,7 +13,11 @@ builder.Services.AddSwaggerGen();
 // Enable Application Insights
 builder.Services.AddApplicationInsightsTelemetry();
 
-builder.Services.AddSingleton(sp => { var kvUrl = builder.Configuration["KEYVAULT_URL"]; return new SecretClient(new Uri(kvUrl), new DefaultAzureCredential()); });
+builder.Services.AddSingleton(sp =>
+{
+    var kvUrl = builder.Configuration["KEYVAULT_URL"];
+    return new SecretClient(new Uri(kvUrl), new DefaultAzureCredential());
+});
 
 var app = builder.Build();
 
