@@ -43,7 +43,7 @@ jobs:
           docker buildx build \
             --platform linux/amd64 \
             -t $REGISTRY/$IMAGE_NAME:latest \
-            -f docker/Dockerfile \
+            -f calculator-api/docker/Dockerfile \
             --push .
 
   deploy-to-aks:
