@@ -18,7 +18,7 @@ builder.Services.AddSwaggerGen();
 // Application Insights
 builder.Services.AddApplicationInsightsTelemetry();
 
-// Key Vault client
+// Key Vault client (DI)
 builder.Services.AddSingleton(sp =>
 {
     var kvUrl = builder.Configuration["KEYVAULT_URL"];
@@ -39,7 +39,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Middleware to validate x-api-key
+// ⭐ IMPORTANT: DO NOT use HTTPS redirection inside AKS containers
+// app.UseHttpsRedirection();
+
+// API key middleware
 app.Use(async (context, next) =>
 {
     var expectedKey = context.RequestServices
@@ -56,6 +59,7 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseHttpsRedirection();
+// Routing
 app.MapControllers();
+
 app.Run();
