@@ -3,6 +3,16 @@ using Microsoft.Extensions.Logging;
 
 namespace WebApi.Controllers
 {
+
+    [ApiController]
+    [Route("health")]
+    public class HealthController : ControllerBase
+    {
+    [HttpGet]
+    public IActionResult Get() => Ok("healthy");
+    }
+
+
     [ApiController]
     [Route("api/[controller]")]
     public class CalcController : ControllerBase

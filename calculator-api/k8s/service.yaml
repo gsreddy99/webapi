@@ -5,11 +5,12 @@ metadata:
   namespace: webapi
   annotations:
     service.beta.kubernetes.io/azure-load-balancer-resource-group: MC_my-aks-cluster_group_my-aks-cluster_centralus
+    service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: /health
 spec:
   type: LoadBalancer
   loadBalancerIP: 20.112.206.23
   selector:
     app: webapi
   ports:
-    - port: 81
+    - port: 80
       targetPort: 80
