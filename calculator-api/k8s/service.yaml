@@ -3,11 +3,13 @@ kind: Service
 metadata:
   name: webapi-service
   namespace: webapi
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-resource-group: MC_my-aks-cluster_group_my-aks-cluster_centralus
 spec:
   type: LoadBalancer
   loadBalancerIP: 20.112.206.23
   selector:
     app: webapi
   ports:
-    - port: 80
-      targetPort: 8080
+    - port: 81
+      targetPort: 80

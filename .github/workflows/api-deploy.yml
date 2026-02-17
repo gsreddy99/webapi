@@ -80,6 +80,8 @@ jobs:
           kubectl apply -n $NAMESPACE -f deployment.yaml
           kubectl apply -n $NAMESPACE -f service.yaml
           kubectl apply -n $NAMESPACE -f ingress.yaml
+          kubectl apply -n $NAMESPACE -f hpa.yaml
+          kubectl apply -n $NAMESPACE -f serviceaccount.yaml
 
       - name: Restart deployment to pull new image
         run: |

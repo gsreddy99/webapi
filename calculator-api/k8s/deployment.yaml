@@ -18,7 +18,7 @@ spec:
       serviceAccountName: webapi-sa   # ⭐ REQUIRED for workload identity
       containers:
         - name: webapi
-          image: srinivasacr.azurecr.io/webapi:latest
+          image: srinivasacr.azurecr.io/webapi:v2
           imagePullPolicy: Always
           ports:
             - containerPort: 80
