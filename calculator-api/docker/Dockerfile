@@ -3,8 +3,8 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 # Copy csproj
-COPY ./src/CalculatorApi.csproj ./
-RUN dotnet restore CalculatorApi.csproj
+COPY ./src/ControllerApi.csproj ./
+RUN dotnet restore ControllerApi.csproj
 
 # Copy the rest of the source
 COPY ./src/ ./
@@ -21,4 +21,4 @@ COPY --from=build /publish .
 EXPOSE 80
 ENV ASPNETCORE_URLS=http://+:80
 
-ENTRYPOINT ["dotnet", "CalculatorApi.dll"]
+ENTRYPOINT ["dotnet", "ControllerApi.dll"]
