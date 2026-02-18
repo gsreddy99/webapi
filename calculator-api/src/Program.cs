@@ -1,6 +1,6 @@
+using System.Text.Json.Serialization;
 using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
-using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,18 +18,26 @@ builder.Services.AddSwaggerGen();
 // Application Insights
 builder.Services.AddApplicationInsightsTelemetry();
 
-// Key Vault client (DI)
-builder.Services.AddSingleton(sp =>
+if (!builder.Environment.IsDevelopment())
 {
-    var kvUrl = builder.Configuration["KEYVAULT_URL"];
-    return new SecretClient(new Uri(kvUrl), new DefaultAzureCredential());
-});
+    // Key Vault client (DI)
+    builder.Services.AddSingleton(sp =>
+    {
+        var kvUrl = builder.Configuration["KEYVAULT_URL"];
+        return new SecretClient(new Uri(kvUrl), new DefaultAzureCredential());
+    });
 
-// Read API key from Key Vault at startup
-var kvUrl2 = builder.Configuration["KEYVAULT_URL"];
-var secretClient = new SecretClient(new Uri(kvUrl2), new DefaultAzureCredential());
-var expectedApiKey = (await secretClient.GetSecretAsync("WebAppApiKey")).Value.Value;
-builder.Configuration["EXPECTED_API_KEY"] = expectedApiKey;
+    // Read API key from Key Vault at startup
+    var kvUrl2 = builder.Configuration["KEYVAULT_URL"];
+    var secretClient = new SecretClient(new Uri(kvUrl2), new DefaultAzureCredential());
+    var expectedApiKey = (await secretClient.GetSecretAsync("WebAppApiKey")).Value.Value;
+    builder.Configuration["EXPECTED_API_KEY"] = expectedApiKey;
+}
+else
+{
+    // Local development fallback
+    builder.Configuration["EXPECTED_API_KEY"] = "local-dev-key";
+}
 
 var app = builder.Build();
 
@@ -39,27 +47,28 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// ⭐ IMPORTANT: DO NOT use HTTPS redirection inside AKS containers
-// app.UseHttpsRedirection();
-
-// API key middleware
-app.Use(async (context, next) =>
+// API key middleware (disabled locally)
+if (!app.Environment.IsDevelopment())
 {
-    var expectedKey = context.RequestServices
-        .GetRequiredService<IConfiguration>()["EXPECTED_API_KEY"];
-
-    if (!context.Request.Headers.TryGetValue("x-api-key", out var providedKey) ||
-        providedKey != expectedKey)
+    app.Use(async (context, next) =>
     {
-        context.Response.StatusCode = 401;
-        await context.Response.WriteAsync("Unauthorized");
-        return;
-    }
+        var expectedKey = context.RequestServices
+            .GetRequiredService<IConfiguration>()["EXPECTED_API_KEY"];
 
-    await next();
-});
+        if (!context.Request.Headers.TryGetValue("x-api-key", out var providedKey) ||
+            providedKey != expectedKey)
+        {
+            context.Response.StatusCode = 401;
+            await context.Response.WriteAsync("Unauthorized");
+            return;
+        }
 
-// Routing
+        await next();
+    });
+}
+
 app.MapControllers();
-
 app.Run();
+
+// Move the partial class declaration to the end of the file
+public partial class Program { }

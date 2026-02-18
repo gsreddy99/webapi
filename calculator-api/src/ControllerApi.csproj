@@ -14,8 +14,9 @@
   <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.22.0" />
 
   <!-- Azure Identity + Key Vault -->
-  <PackageReference Include="Azure.Identity" Version="1.11.0" />
-  <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.6.0" />
+  <PackageReference Include="Azure.Identity" Version="1.17.1" />
+  <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.8.0" />
+  <PackageReference Include="System.Text.Json" Version="10.0.3" />
 </ItemGroup>
 
 

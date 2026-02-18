@@ -21,6 +21,61 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      # ---------------------------
+      # Install ReportGenerator
+      # ---------------------------
+      - name: Install ReportGenerator
+        run: dotnet tool install -g dotnet-reportgenerator-globaltool
+
+      - name: Add tool path
+        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+      # ---------------------------
+      # Run unit + integration tests
+      # ---------------------------
+      - name: Run unit + integration tests
+        run: |
+          dotnet test \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults \
+            --verbosity normal
+
+      # ---------------------------
+      # Generate coverage report
+      # ---------------------------
+      - name: Generate code coverage report
+        run: |
+          reportgenerator \
+            -reports:TestResults/**/coverage.cobertura.xml \
+            -targetdir:CoverageReport \
+            -reporttypes:Html
+
+      # ---------------------------
+      # Upload artifacts
+      # ---------------------------
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: CoverageReport
+
+      - name: Publish test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults
+
+      # ---------------------------
+      # Build + Push Docker Image
+      # ---------------------------
       - name: Azure Login
         uses: azure/login@v2
         with:
@@ -46,6 +101,7 @@ jobs:
             -f calculator-api/docker/Dockerfile \
             --push \
             calculator-api
+
   deploy-to-aks:
     needs: build-and-push
     runs-on: ubuntu-latest

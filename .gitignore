@@ -3,3 +3,7 @@
 /.idea/
 /calculator-api/src/bin/
 /calculator-api/src/obj/
+/.DS_Store
+.DS_Store
+/calculator-api.tests/bin/
+/calculator-api.tests/obj/

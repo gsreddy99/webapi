@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/calculator-api/" />
+  <Folder Name="/calculator-api/src/">
+    <Project Path="calculator-api/src/ControllerApi.csproj" />
+  </Folder>
+  <Project Path="calculator-api.tests/calculator-api.tests.csproj" />
+</Solution>
