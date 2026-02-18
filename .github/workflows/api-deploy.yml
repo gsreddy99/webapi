@@ -21,6 +21,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ---------------------------------------------------
+      # AI Review Step (Copilot Actions)
+      # ---------------------------------------------------
+      - name: AI Review Config Files
+        uses: github/copilot-actions/review@v1
+        with:
+          files: |
+            calculator-api/k8s/*.yaml
+            calculator-api/docker/Dockerfile
+            .github/workflows/*.yml
+          instructions: |
+            Review these configuration files for:
+            - Kubernetes best practices
+            - AKS-specific issues
+            - Security misconfigurations
+            - YAML schema issues
+            - Dockerfile optimization
+            - GitHub Actions workflow improvements
+      # ---------------------------------------------------
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
