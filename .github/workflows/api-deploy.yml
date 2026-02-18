@@ -21,31 +21,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ---------------------------------------------------
-      # AI Review Step (GitHub Copilot CLI)
-      # ---------------------------------------------------
-      - name: Install GitHub Copilot CLI
-        run: |
-          npm install -g @githubnext/github-copilot-cli
-          echo "$(npm root -g)/../bin" >> $GITHUB_PATH
-
-      - name: AI Review Config Files
-        uses: github/copilot-actions/review@v1
-        with:
-          files: |
-            calculator-api/k8s/*.yaml
-            calculator-api/docker/Dockerfile
-            .github/workflows/*.yml
-          instructions: |
-            Review these files for:
-            - Kubernetes best practices
-            - AKS-specific issues
-            - Security misconfigurations
-            - YAML schema issues
-            - Dockerfile optimization
-            - GitHub Actions workflow improvements
-
-      # ---------------------------------------------------
+#      # ---------------------------------------------------
+#      # AI Review Step (Azure OpenAI)
+#      # ---------------------------------------------------
+#      - name: Install Python dependencies
+#        run: |
+#          pip install openai
+#
+#      - name: Run AI Review
+#        run: |
+#          python3 ai-review.py
+#        env:
+#          AOAI_ENDPOINT: ${{ secrets.AOAI_ENDPOINT }}
+#          AOAI_KEY: ${{ secrets.AOAI_KEY }}
+#          AOAI_DEPLOYMENT: ${{ secrets.AOAI_DEPLOYMENT }}
+#      # ---------------------------------------------------
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
