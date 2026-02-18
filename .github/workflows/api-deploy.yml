@@ -29,18 +29,14 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
-      # ---------------------------
-      # Install ReportGenerator
-      # ---------------------------
+      # Install ReportGenerator for coverage
       - name: Install ReportGenerator
         run: dotnet tool install -g dotnet-reportgenerator-globaltool
 
       - name: Add tool path
         run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
-      # ---------------------------
-      # Run unit + integration tests
-      # ---------------------------
+      # Run unit + integration tests with coverage
       - name: Run unit + integration tests
         run: |
           dotnet test \
@@ -48,9 +44,7 @@ jobs:
             --results-directory ./TestResults \
             --verbosity normal
 
-      # ---------------------------
-      # Generate coverage report
-      # ---------------------------
+      # Generate HTML coverage report
       - name: Generate code coverage report
         run: |
           reportgenerator \
@@ -58,9 +52,7 @@ jobs:
             -targetdir:CoverageReport \
             -reporttypes:Html
 
-      # ---------------------------
       # Upload artifacts
-      # ---------------------------
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
@@ -73,9 +65,7 @@ jobs:
           name: test-results
           path: TestResults
 
-      # ---------------------------
       # Build + Push Docker Image
-      # ---------------------------
       - name: Azure Login
         uses: azure/login@v2
         with:
@@ -103,8 +93,12 @@ jobs:
             calculator-api
 
   deploy-to-aks:
+    # Only deploy main branch AND require approval
+    if: github.ref == 'refs/heads/main'
     needs: build-and-push
     runs-on: ubuntu-latest
+    environment:
+      name: prod   # <-- YOUR ENVIRONMENT NAME
 
     steps:
       - name: Checkout
