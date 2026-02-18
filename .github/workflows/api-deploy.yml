@@ -21,21 +21,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-#      # ---------------------------------------------------
-#      # AI Review Step (Azure OpenAI)
-#      # ---------------------------------------------------
-#      - name: Install Python dependencies
-#        run: |
-#          pip install openai
-#
-#      - name: Run AI Review
-#        run: |
-#          python3 ai-review.py
-#        env:
-#          AOAI_ENDPOINT: ${{ secrets.AOAI_ENDPOINT }}
-#          AOAI_KEY: ${{ secrets.AOAI_KEY }}
-#          AOAI_DEPLOYMENT: ${{ secrets.AOAI_DEPLOYMENT }}
-#      # ---------------------------------------------------
+      # ---------------------------------------------------
+      # AI Review Step (Azure OpenAI)
+      # ---------------------------------------------------
+      - name: Install Python dependencies
+        run: |
+          pip install openai
+
+      - name: Run AI Review
+        run: |
+          python3 ai-review.py
+        env:
+          AOAI_ENDPOINT: ${{ secrets.AOAI_ENDPOINT }}
+          AOAI_KEY: ${{ secrets.AOAI_KEY }}
+          AOAI_DEPLOYMENT: ${{ secrets.AOAI_DEPLOYMENT }}
+      # ---------------------------------------------------
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
