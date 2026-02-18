@@ -1,69 +1,67 @@
 import os
 import glob
-import openai
+from openai import AzureOpenAI
 
-# Load Azure OpenAI configuration from environment variables
-endpoint = os.getenv("AOAI_ENDPOINT")
-api_key = os.getenv("AOAI_KEY")
-deployment = os.getenv("AOAI_DEPLOYMENT")
-
-# Azure OpenAI client configuration
-openai.api_type = "azure"
-openai.api_base = endpoint
-openai.api_key = api_key
-openai.api_version = "2024-02-01"
-
-def read_files(patterns):
-    """Reads all files matching the given glob patterns."""
-    content = ""
-    for pattern in patterns:
-        for file in glob.glob(pattern):
-            try:
-                with open(file, "r") as f:
-                    content += f"\n\n===== FILE: {file} =====\n"
-                    content += f.read()
-            except Exception as e:
-                content += f"\n\n===== FILE: {file} (ERROR READING FILE: {e}) =====\n"
-    return content
-
-# Files to review
-files_to_review = [
-    "calculator-api/k8s/*.yaml",
-    "calculator-api/docker/Dockerfile",
-    ".github/workflows/*.yml"
-]
-
-content = read_files(files_to_review)
-
-prompt = f"""
-You are an expert DevOps reviewer.
-
-Review the following configuration files for:
-- Kubernetes best practices
-- AKS-specific issues
-- Security misconfigurations
-- YAML schema issues
-- Dockerfile optimization
-- GitHub Actions workflow improvements
-
-Provide a clear, structured report with:
-1. Summary
-2. Issues found
-3. Severity (High / Medium / Low)
-4. Recommended fixes
-5. Best practice suggestions
-
-Files:
-{content}
-"""
-
-response = openai.ChatCompletion.create(
-    engine=deployment,
-    messages=[{"role": "user", "content": prompt}],
-    max_tokens=2000,
-    temperature=0.2
+# Initialize Azure OpenAI client
+client = AzureOpenAI(
+    api_key=os.environ["AOAI_KEY"],
+    azure_endpoint=os.environ["AOAI_ENDPOINT"],
+    api_version="2024-12-01-preview"
 )
 
-print("\n\n===== AI REVIEW REPORT =====\n")
-print(response["choices"][0]["message"]["content"])
-print("\n===== END OF REPORT =====\n")
+deployment = os.environ["AOAI_DEPLOYMENT"]  # "o4-mini"
+
+# Files you want to review
+FILES_TO_REVIEW = [
+    "Dockerfile",
+    "*.yml",
+    "*.yaml",
+    "*.json",
+    "*.py"
+]
+
+def read_files():
+    contents = []
+    for pattern in FILES_TO_REVIEW:
+        for file in glob.glob(pattern, recursive=True):
+            try:
+                with open(file, "r") as f:
+                    contents.append(f"\n\n===== FILE: {file} =====\n{f.read()}")
+            except Exception as e:
+                contents.append(f"\n\n===== FILE: {file} (ERROR READING) =====\n{e}")
+    return "\n".join(contents)
+
+def run_review():
+    files_text = read_files()
+
+    prompt = f"""
+You are an expert DevOps and cloud reviewer.
+Review the following project files and provide:
+
+1. Kubernetes issues
+2. Dockerfile issues
+3. GitHub Actions issues
+4. Security risks
+5. Best practices
+6. Fix suggestions
+
+Be concise but clear.
+
+FILES:
+{files_text}
+"""
+
+    response = client.chat.completions.create(
+        model=deployment,
+        messages=[
+            {"role": "system", "content": "You are an expert DevOps reviewer."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+
+    print("\n\n===== AI REVIEW OUTPUT =====\n")
+    print(response.choices[0].message["content"])
+    print("\n===== END OF REVIEW =====\n")
+
+if __name__ == "__main__":
+    run_review()
