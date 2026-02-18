@@ -30,21 +30,21 @@ jobs:
           echo "$(npm root -g)/../bin" >> $GITHUB_PATH
 
       - name: AI Review Config Files
-        run: |
-          echo "Running AI review on config files..."
-          gh-copilot review \
-            calculator-api/k8s/*.yaml \
-            calculator-api/docker/Dockerfile \
-            .github/workflows/*.yml \
-            --instructions "
-              Review these files for:
-              - Kubernetes best practices
-              - AKS-specific issues
-              - Security misconfigurations
-              - YAML schema issues
-              - Dockerfile optimization
-              - GitHub Actions workflow improvements
-            "
+        uses: github/copilot-actions/review@v1
+        with:
+          files: |
+            calculator-api/k8s/*.yaml
+            calculator-api/docker/Dockerfile
+            .github/workflows/*.yml
+          instructions: |
+            Review these files for:
+            - Kubernetes best practices
+            - AKS-specific issues
+            - Security misconfigurations
+            - YAML schema issues
+            - Dockerfile optimization
+            - GitHub Actions workflow improvements
+
       # ---------------------------------------------------
 
       - name: Setup .NET
