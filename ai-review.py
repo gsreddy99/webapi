@@ -60,7 +60,7 @@ FILES:
     )
 
     print("\n\n===== AI REVIEW OUTPUT =====\n")
-    print(response.choices[0].message["content"])
+    print(response.choices[0].message.content)
     print("\n===== END OF REVIEW =====\n")
 
 if __name__ == "__main__":
