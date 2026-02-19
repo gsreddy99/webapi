@@ -17,7 +17,8 @@ FILES_TO_REVIEW = [
     "*.yml",
     "*.yaml",
     "*.json",
-    "*.py"
+    "*.py",
+    "*.cs"
 ]
 
 def read_files():
@@ -44,6 +45,7 @@ Review the following project files and provide:
 4. Security risks
 5. Best practices
 6. Fix suggestions
+
 
 Be concise but clear.
 
