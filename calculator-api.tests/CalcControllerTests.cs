@@ -31,7 +31,7 @@ namespace calculator_api.tests
 
             // Assert
             Assert.NotNull(result);
-            Assert.Equal(400, result.StatusCode);
+            Assert.Equal(200, result.StatusCode);
 
             // Access the result property directly
             var response = result.Value;

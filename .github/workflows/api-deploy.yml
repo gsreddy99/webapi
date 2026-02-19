@@ -98,7 +98,7 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
-            -t $REGISTRY/$IMAGE_NAME:v3 \
+            -t $REGISTRY/$IMAGE_NAME:v4 \
             -f calculator-api/docker/Dockerfile \
             --push \
             calculator-api
