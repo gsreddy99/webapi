@@ -77,31 +77,35 @@ jobs:
           name: test-results
           path: TestResults
 
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      # ---------------------------------------------------
+      # ACR login (DISABLED)
+      # ---------------------------------------------------
+      # - name: Azure Login
+      #   uses: azure/login@v2
+      #   with:
+      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Login to ACR
-        run: az acr login --name srinivasacr
+      # - name: Login to ACR
+      #   run: az acr login --name srinivasacr
 
-      - name: Debug registry var
-        run: echo "REGISTRY = $REGISTRY"
+      # - name: Debug registry var
+      #   run: echo "REGISTRY = $REGISTRY"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      # - name: Set up QEMU
+      #   uses: docker/setup-qemu-action@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      # - name: Set up Docker Buildx
+      #   uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image (amd64 + arm64)
-        run: |
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            -t $REGISTRY/$IMAGE_NAME:v4 \
-            -f calculator-api/docker/Dockerfile \
-            --push \
-            calculator-api
+      # - name: Build and push Docker image (amd64 + arm64)
+      #   run: |
+      #     docker buildx build \
+      #       --platform linux/amd64,linux/arm64 \
+      #       -t $REGISTRY/$IMAGE_NAME:v4 \
+      #       -f calculator-api/docker/Dockerfile \
+      #       --push \
+      #       calculator-api
+      # ---------------------------------------------------
 
   deploy-to-aks:
     if: github.ref == 'refs/heads/main'
@@ -114,32 +118,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      # ---------------------------------------------------
+      # AKS deployment (DISABLED)
+      # ---------------------------------------------------
+      # - name: Azure Login
+      #   uses: azure/login@v2
+      #   with:
+      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Set AKS context
-        uses: azure/aks-set-context@v3
-        with:
-          resource-group: ${{ env.AKS_RESOURCE_GROUP }}
-          cluster-name: ${{ env.AKS_CLUSTER_NAME }}
+      # - name: Set AKS context
+      #   uses: azure/aks-set-context@v3
+      #   with:
+      #     resource-group: ${{ env.AKS_RESOURCE_GROUP }}
+      #     cluster-name: ${{ env.AKS_CLUSTER_NAME }}
 
-      - name: Create namespace (idempotent)
-        run: |
-          kubectl create namespace $NAMESPACE \
-            --dry-run=client -o yaml | kubectl apply -f -
+      # - name: Create namespace (idempotent)
+      #   run: |
+      #     kubectl create namespace $NAMESPACE \
+      #       --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Deploy manifests
-        working-directory: calculator-api/k8s
-        run: |
-          kubectl apply -n $NAMESPACE -f namespace.yaml
-          kubectl apply -n $NAMESPACE -f deployment.yaml
-          kubectl apply -n $NAMESPACE -f service.yaml
-          kubectl apply -n $NAMESPACE -f ingress.yaml
-          kubectl apply -n $NAMESPACE -f hpa.yaml
-          kubectl apply -n $NAMESPACE -f serviceaccount.yaml
+      # - name: Deploy manifests
+      #   working-directory: calculator-api/k8s
+      #   run: |
+      #     kubectl apply -n $NAMESPACE -f namespace.yaml
+      #     kubectl apply -n $NAMESPACE -f deployment.yaml
+      #     kubectl apply -n $NAMESPACE -f service.yaml
+      #     kubectl apply -n $NAMESPACE -f ingress.yaml
+      #     kubectl apply -n $NAMESPACE -f hpa.yaml
+      #     kubectl apply -n $NAMESPACE -f serviceaccount.yaml
 
-      - name: Restart deployment to pull new image
-        run: |
-          kubectl rollout restart deployment webapi-deployment -n $NAMESPACE
+      # - name: Restart deployment to pull new image
+      #   run: |
+      #     kubectl rollout restart deployment webapi-deployment -n $NAMESPACE
+      # ---------------------------------------------------
