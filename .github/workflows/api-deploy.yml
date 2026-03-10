@@ -28,9 +28,20 @@ jobs:
         run: |
           pip install openai
 
-      - name: Run AI Review
+      - name: Run AI Review (Architecture + Config)
         run: |
           python3 ai-review.py
+        env:
+          AOAI_ENDPOINT: ${{ secrets.AOAI_ENDPOINT }}
+          AOAI_KEY: ${{ secrets.AOAI_KEY }}
+          AOAI_DEPLOYMENT: ${{ secrets.AOAI_DEPLOYMENT }}
+
+      # ---------------------------------------------------
+      # API Behavior + Contract QA (Azure OpenAI)
+      # ---------------------------------------------------
+      - name: Run API Contract Review
+        run: |
+          python3 ai-api-contract-review.py
         env:
           AOAI_ENDPOINT: ${{ secrets.AOAI_ENDPOINT }}
           AOAI_KEY: ${{ secrets.AOAI_KEY }}
