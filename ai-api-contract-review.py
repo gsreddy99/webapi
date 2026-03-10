@@ -32,7 +32,7 @@ def run_review():
     files_text = read_files()
 
     prompt = f"""
-You are an expert API QA engineer specializing in REST API behavior, correctness, and contract validation.
+You are an expert API QA engineer and senior .NET backend engineer.
 
 Analyze ONLY the API controllers in the provided C# files and evaluate:
 
@@ -47,6 +47,17 @@ Analyze ONLY the API controllers in the provided C# files and evaluate:
 9. Security considerations (input sanitization, error exposure)
 10. Recommendations for improving API contract quality
 
+AFTER the review, produce the following additional sections:
+
+### CODE FIXES (MANDATORY)
+Provide a unified diff patch (```diff) showing EXACT code changes needed to fix issues.
+
+### REWRITTEN CONTROLLER (MANDATORY)
+Provide a fully corrected and improved version of the controller code in C#.
+
+### IMPROVED API CONTRACT (OPTIONAL)
+If applicable, propose an improved API contract or OpenAPI snippet.
+
 IMPORTANT:
 - Base your analysis ONLY on the provided code.
 - If something is missing (e.g., no OpenAPI spec), explicitly say: "Not found in provided files."
@@ -58,7 +69,7 @@ FILES:
     response = client.chat.completions.create(
         model=deployment,
         messages=[
-            {"role": "system", "content": "You are an expert API QA reviewer."},
+            {"role": "system", "content": "You are an expert API QA reviewer and senior backend engineer."},
             {"role": "user", "content": prompt}
         ]
     )
