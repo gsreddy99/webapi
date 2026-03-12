@@ -1,61 +1,57 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 
 namespace WebApi.Controllers
 {
-
-// test
-    [ApiController]
-    [Route("health")]
-    public class HealthController : ControllerBase
-    {
-    [HttpGet]
-    public IActionResult Get() => Ok("healthy");
-    }
-
-
     [ApiController]
     [Route("api/[controller]")]
-    public class CalcController : ControllerBase
+    public class SalesController : ControllerBase
     {
-        private readonly ILogger<CalcController> _logger;
+        private readonly ILogger<SalesController> _logger;
 
-        public CalcController(ILogger<CalcController> logger)
+        public SalesController(ILogger<SalesController> logger)
         {
             _logger = logger;
         }
 
-        [HttpGet]
-        public IActionResult Calculate(double a, double b, string op)
+        /// <summary>
+        /// Returns a deterministic sales summary for a given date.
+        /// </summary>
+        /// <param name="date">Date in YYYY-MM-DD format.</param>
+        /// <returns>Sales amount for the given date.</returns>
+        [HttpGet("summary")]
+        public IActionResult GetSalesSummary([FromQuery] string date)
         {
-            _logger.LogInformation("Received request: a={A}, b={B}, op={Op}", a, b, op);
+            _logger.LogInformation("Received sales summary request for date={Date}", date);
 
-            // Validate operator
-            if (op is not ("add" or "subtract" or "multiply" or "divide"))
+            if (string.IsNullOrWhiteSpace(date))
             {
-                _logger.LogWarning("Invalid operator received: {Op}", op);
-                return BadRequest(new { error = "Invalid operator. Use add, subtract, multiply, or divide." });
+                _logger.LogWarning("Missing required 'date' query parameter.");
+                return BadRequest(new { error = "Query parameter 'date' is required in YYYY-MM-DD format." });
             }
 
-            // Handle divide by zero
-            if (op == "divide" && b == 0)
+            if (!DateTime.TryParse(date, out var parsedDate))
             {
-                _logger.LogWarning("Division by zero attempted: a={A}, b={B}", a, b);
-                return BadRequest(new { error = "Division by zero is not allowed." });
+                _logger.LogWarning("Invalid date format received: {Date}", date);
+                return BadRequest(new { error = "Invalid date format. Use YYYY-MM-DD." });
             }
 
-            double result = op switch
+            string normalizedDate = parsedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+            int year = parsedDate.Year;
+            int month = parsedDate.Month;
+            int day = parsedDate.Day;
+
+            double amount = ((year * month * day) % 5000) + 500;
+
+            _logger.LogInformation("Sales summary for {Date}: {Amount}", normalizedDate, amount);
+
+            return Ok(new
             {
-                "add" => a + b,
-                "subtract" => a - b,
-                "multiply" => a * b,
-                "divide" => a / b,
-                _ => 0 // unreachable because we validated above
-            };
-
-            _logger.LogInformation("Calculated result: {Result}", result);
-
-            return Ok(new { result });
+                date = normalizedDate,
+                amount
+            });
         }
     }
 }

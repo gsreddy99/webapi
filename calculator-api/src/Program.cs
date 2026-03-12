@@ -18,19 +18,21 @@ builder.Services.AddSwaggerGen();
 // Application Insights
 builder.Services.AddApplicationInsightsTelemetry();
 
+// Key Vault + API key loading
 if (!builder.Environment.IsDevelopment())
 {
-    // Key Vault client (DI)
+    // Register SecretClient in DI
     builder.Services.AddSingleton(sp =>
     {
         var kvUrl = builder.Configuration["KEYVAULT_URL"];
         return new SecretClient(new Uri(kvUrl), new DefaultAzureCredential());
     });
 
-    // Read API key from Key Vault at startup
+    // Load API key at startup
     var kvUrl2 = builder.Configuration["KEYVAULT_URL"];
     var secretClient = new SecretClient(new Uri(kvUrl2), new DefaultAzureCredential());
     var expectedApiKey = (await secretClient.GetSecretAsync("WebAppApiKey")).Value.Value;
+
     builder.Configuration["EXPECTED_API_KEY"] = expectedApiKey;
 }
 else
@@ -41,11 +43,15 @@ else
 
 var app = builder.Build();
 
+// Swagger UI
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// REQUIRED: Routing middleware
+app.UseRouting();
 
 // API key middleware (disabled locally)
 if (!app.Environment.IsDevelopment())
@@ -67,8 +73,13 @@ if (!app.Environment.IsDevelopment())
     });
 }
 
+// Authorization (safe default)
+app.UseAuthorization();
+
+// REQUIRED: Map controllers AFTER routing
 app.MapControllers();
+
 app.Run();
 
-// Move the partial class declaration to the end of the file
+// Required for integration testing
 public partial class Program { }
