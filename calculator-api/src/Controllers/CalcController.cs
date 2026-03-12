@@ -1,122 +1,71 @@
-import os
-import sys
-import subprocess
-from pathlib import Path
-from openai import AzureOpenAI
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
-# Azure OpenAI client
-client = AzureOpenAI(
-    api_key=os.environ["AOAI_KEY"],
-    azure_endpoint=os.environ["AOAI_ENDPOINT"],
-    api_version="2024-12-01-preview"
-)
+namespace WebApi.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class CalcController : ControllerBase
+    {
+        private readonly ILogger<CalcController> _logger;
 
-deployment = os.environ["AOAI_DEPLOYMENT"]
+        public CalcController(ILogger<CalcController> logger)
+        {
+            _logger = logger;
+        }
 
-# The ONLY file the AI is allowed to modify
-TARGET_FILE = Path("calculator-api/src/Controllers/CalcController.cs")
+        /// <summary>
+        /// Performs a basic arithmetic operation.
+        /// </summary>
+        /// <param name="a">First operand.</param>
+        /// <param name="b">Second operand.</param>
+        /// <param name="op">Operation: add, subtract, multiply, divide.</param>
+        /// <returns>JSON result or error.</returns>
+        [HttpGet]
+        public IActionResult Calculate(
+            [FromQuery] double a,
+            [FromQuery] double b,
+            [FromQuery] string op)
+        {
+            _logger.LogInformation("Calculate called with a={A}, b={B}, op={Op}", a, b, op);
 
+            if (string.IsNullOrWhiteSpace(op))
+            {
+                _logger.LogWarning("Operator missing.");
+                return BadRequest(new { error = "Operator is required. Use add, subtract, multiply, or divide." });
+            }
 
-def read_calc_controller():
-    if not TARGET_FILE.exists():
-        print(f"ERROR: {TARGET_FILE} not found.")
-        sys.exit(1)
-    return TARGET_FILE.read_text()
+            double result;
 
+            switch (op.ToLowerInvariant())
+            {
+                case "add":
+                    result = a + b;
+                    break;
 
-def extract_diff(output):
-    if "```diff" not in output:
-        return None
-    return output.split("```diff")[1].split("```")[0].strip()
+                case "subtract":
+                    result = a - b;
+                    break;
 
+                case "multiply":
+                    result = a * b;
+                    break;
 
-def is_valid_diff(diff):
-    # Must contain exactly one diff header
-    if diff.count("diff --git") != 1:
-        return False
+                case "divide":
+                    if (b == 0)
+                    {
+                        _logger.LogWarning("Division by zero attempt: a={A}, b={B}", a, b);
+                        return BadRequest(new { error = "Division by zero is not allowed." });
+                    }
+                    result = a / b;
+                    break;
 
-    # Must reference ONLY the target file
-    if TARGET_FILE.name not in diff:
-        return False
+                default:
+                    _logger.LogWarning("Invalid operator received: {Op}", op);
+                    return BadRequest(new { error = "Invalid operator. Use add, subtract, multiply, or divide." });
+            }
 
-    # Validate hunk headers
-    for line in diff.splitlines():
-        if line.startswith("@@"):
-            header = line.replace("@", "").replace("-", "").replace("+", "").replace(",", "").replace(" ", "")
-            if not header.isdigit():
-                return False
-
-    return True
-
-
-def apply_patch(diff):
-    patch_file = "ai_patch.diff"
-    with open(patch_file, "w") as f:
-        f.write(diff)
-
-    try:
-        subprocess.run(["git", "apply", patch_file], check=True)
-        return True
-    except subprocess.CalledProcessError:
-        return False
-
-
-def create_fix_branch():
-    subprocess.run(["git", "checkout", "-b", "fix-ai"], check=False)
-    subprocess.run(["git", "add", "."], check=False)
-    subprocess.run(["git", "commit", "-m", "AI auto-fix"], check=False)
-    subprocess.run(["git", "push", "-u", "origin", "fix-ai"], check=False)
-
-
-def run_review():
-    controller_code = read_calc_controller()
-
-    prompt = f"""
-You are an expert .NET API engineer.
-
-You will receive ONE file only:
-CalcController.cs
-
-Your job:
-- Identify issues in THIS file only.
-- Fix ONLY this file.
-- Produce a unified diff patch for THIS file only.
-- NO multi-file diffs.
-- NO new files.
-- NO deletions.
-- NO renames.
-- Hunk headers MUST be numeric (e.g., @@ -1,5 +1,10 @@).
-- Patch MUST apply cleanly with `git apply`.
-
-===== FILE: CalcController.cs =====
-{controller_code}
-"""
-
-    response = client.chat.completions.create(
-        model=deployment,
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    output = response.choices[0].message.content
-    print(output)
-
-    diff = extract_diff(output)
-
-    if not diff:
-        print("No diff found. Failing.")
-        sys.exit(1)
-
-    if not is_valid_diff(diff):
-        print("Invalid diff. Failing.")
-        sys.exit(1)
-
-    if apply_patch(diff):
-        print("Patch applied.")
-        create_fix_branch()
-    else:
-        print("Patch failed to apply.")
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    run_review()
+            return Ok(new { result });
+        }
+    }
+}

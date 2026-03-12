@@ -25,12 +25,10 @@ jobs:
       # AI Review Step (Azure OpenAI)
       # ---------------------------------------------------
       - name: Install Python dependencies
-        run: |
-          pip install openai
+        run: pip install openai
 
       - name: Run AI Review (Architecture + Config)
-        run: |
-          python3 ai-review.py
+        run: python3 ai-review.py
         env:
           AOAI_ENDPOINT: ${{ secrets.AOAI_ENDPOINT }}
           AOAI_KEY: ${{ secrets.AOAI_KEY }}
@@ -40,14 +38,15 @@ jobs:
       # API Behavior + Contract QA (Azure OpenAI)
       # ---------------------------------------------------
       - name: Run API Contract Review
-        run: |
-          python3 ai-api-contract-review.py
+        run: python3 ai-api-contract-review.py
         env:
           AOAI_ENDPOINT: ${{ secrets.AOAI_ENDPOINT }}
           AOAI_KEY: ${{ secrets.AOAI_KEY }}
           AOAI_DEPLOYMENT: ${{ secrets.AOAI_DEPLOYMENT }}
-      # ---------------------------------------------------
 
+      # ---------------------------------------------------
+      # .NET Build + Tests + Coverage
+      # ---------------------------------------------------
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -88,36 +87,6 @@ jobs:
           name: test-results
           path: TestResults
 
-      # ---------------------------------------------------
-      # ACR login (DISABLED)
-      # ---------------------------------------------------
-      # - name: Azure Login
-      #   uses: azure/login@v2
-      #   with:
-      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      # - name: Login to ACR
-      #   run: az acr login --name srinivasacr
-
-      # - name: Debug registry var
-      #   run: echo "REGISTRY = $REGISTRY"
-
-      # - name: Set up QEMU
-      #   uses: docker/setup-qemu-action@v3
-
-      # - name: Set up Docker Buildx
-      #   uses: docker/setup-buildx-action@v3
-
-      # - name: Build and push Docker image (amd64 + arm64)
-      #   run: |
-      #     docker buildx build \
-      #       --platform linux/amd64,linux/arm64 \
-      #       -t $REGISTRY/$IMAGE_NAME:v4 \
-      #       -f calculator-api/docker/Dockerfile \
-      #       --push \
-      #       calculator-api
-      # ---------------------------------------------------
-
   deploy-to-aks:
     if: github.ref == 'refs/heads/main'
     needs: build-and-push
@@ -129,9 +98,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ---------------------------------------------------
-      # AKS deployment (DISABLED)
-      # ---------------------------------------------------
+      # Deployment disabled (uncomment when ready)
       # - name: Azure Login
       #   uses: azure/login@v2
       #   with:
@@ -143,11 +110,6 @@ jobs:
       #     resource-group: ${{ env.AKS_RESOURCE_GROUP }}
       #     cluster-name: ${{ env.AKS_CLUSTER_NAME }}
 
-      # - name: Create namespace (idempotent)
-      #   run: |
-      #     kubectl create namespace $NAMESPACE \
-      #       --dry-run=client -o yaml | kubectl apply -f -
-
       # - name: Deploy manifests
       #   working-directory: calculator-api/k8s
       #   run: |
@@ -157,8 +119,3 @@ jobs:
       #     kubectl apply -n $NAMESPACE -f ingress.yaml
       #     kubectl apply -n $NAMESPACE -f hpa.yaml
       #     kubectl apply -n $NAMESPACE -f serviceaccount.yaml
-
-      # - name: Restart deployment to pull new image
-      #   run: |
-      #     kubectl rollout restart deployment webapi-deployment -n $NAMESPACE
-      # ---------------------------------------------------

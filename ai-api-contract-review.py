@@ -1,11 +1,12 @@
 import os
 import sys
-import json
 import subprocess
-import requests
 from pathlib import Path
 from openai import AzureOpenAI
 
+# ---------------------------------------------------------
+# Azure OpenAI Client
+# ---------------------------------------------------------
 client = AzureOpenAI(
     api_key=os.environ["AOAI_KEY"],
     azure_endpoint=os.environ["AOAI_ENDPOINT"],
@@ -14,73 +15,44 @@ client = AzureOpenAI(
 
 deployment = os.environ["AOAI_DEPLOYMENT"]
 
-ROOT = Path(".")
-PATTERNS = ["**/*.cs"]
-API_BASE = os.environ.get("API_BASE", "http://localhost:5196")
+# ---------------------------------------------------------
+# The ONLY file the AI is allowed to modify
+# ---------------------------------------------------------
+TARGET_FILE = (Path(__file__).parent / "calculator-api" / "src" / "Controllers" / "CalcController.cs").resolve()
+
+print("Loading controller from:", TARGET_FILE)
+print("Exists:", TARGET_FILE.exists())
+
+if not TARGET_FILE.exists():
+    print("ERROR: CalcController.cs not found. Fix the path.")
+    sys.exit(1)
 
 
-# -----------------------------
-# Read all C# files
-# -----------------------------
-def read_files():
-    contents = []
-    for pattern in PATTERNS:
-        for path in ROOT.glob(pattern):
-            if not path.is_file():
-                continue
-            try:
-                text = path.read_text(errors="ignore")
-                contents.append(f"\n\n===== FILE: {path} =====\n{text}")
-            except Exception as e:
-                contents.append(f"\n\n===== FILE: {path} (ERROR READING) =====\n{e}")
-    return "\n".join(contents)
+# ---------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------
+def read_calc_controller():
+    return TARGET_FILE.read_text(errors="ignore")
 
 
-# -----------------------------
-# Call API endpoints
-# -----------------------------
-def test_endpoints():
-    results = {}
-
-    endpoints = {
-        "root": f"{API_BASE}/",
-        "health": f"{API_BASE}/health",
-        "test": f"{API_BASE}/api/test",
-        "sales": f"{API_BASE}/api/sales/summary?date=2025-02-15",
-        "calc": f"{API_BASE}/api/calc?a=10&b=5&op=add"
-    }
-
-    for name, url in endpoints.items():
-        try:
-            r = requests.get(url, timeout=5)
-            results[name] = {
-                "url": url,
-                "status": r.status_code,
-                "body": r.text
-            }
-        except Exception as e:
-            results[name] = {"url": url, "error": str(e)}
-
-    return json.dumps(results, indent=2)
+def extract_diff(output):
+    if "```diff" not in output:
+        return None
+    return output.split("```diff")[1].split("```")[0].strip()
 
 
-# -----------------------------
-# Validate diff syntax
-# -----------------------------
 def is_valid_diff(diff):
-    lines = diff.splitlines()
-
-    # Must contain exactly ONE file diff
+    # Must contain exactly one diff header
     if diff.count("diff --git") != 1:
         return False
 
-    for line in lines:
-        if line.startswith("@@"):
-            # Must match @@ -a,b +c,d @@
-            if not ("@@" in line and "-" in line and "+" in line and "," in line):
-                return False
+    # Must reference ONLY CalcController.cs
+    if "CalcController.cs" not in diff:
+        return False
 
-            # Remove symbols and check numeric
+    # Validate hunk headers
+    for line in diff.splitlines():
+        if line.startswith("@@"):
             header = line.replace("@", "").replace("-", "").replace("+", "").replace(",", "").replace(" ", "")
             if not header.isdigit():
                 return False
@@ -88,32 +60,18 @@ def is_valid_diff(diff):
     return True
 
 
-# -----------------------------
-# Extract diff from LLM output
-# -----------------------------
-def extract_diff(output):
-    if "```diff" not in output:
-        return None
-    return output.split("```diff")[1].split("```")[0].strip()
-
-
-# -----------------------------
-# Apply patch
-# -----------------------------
 def apply_patch(diff):
-    with open("ai_patch.diff", "w") as f:
+    patch_file = "ai_patch.diff"
+    with open(patch_file, "w") as f:
         f.write(diff)
 
     try:
-        subprocess.run(["git", "apply", "ai_patch.diff"], check=True)
+        subprocess.run(["git", "apply", patch_file], check=True)
         return True
     except subprocess.CalledProcessError:
         return False
 
 
-# -----------------------------
-# Create fix-ai branch
-# -----------------------------
 def create_fix_branch():
     subprocess.run(["git", "checkout", "-b", "fix-ai"], check=False)
     subprocess.run(["git", "add", "."], check=False)
@@ -121,56 +79,31 @@ def create_fix_branch():
     subprocess.run(["git", "push", "-u", "origin", "fix-ai"], check=False)
 
 
-# -----------------------------
-# Ask LLM for corrected diff
-# -----------------------------
-def regenerate_diff(bad_diff):
-    prompt = f"""
-The previous diff was INVALID.
-
-Produce ONLY a valid unified diff patch for ONE file.
-
-STRICT RULES:
-- ONE file only.
-- NO English words in hunk headers.
-- NO placeholders.
-- Hunk headers MUST be numeric: @@ -0,0 +1,70 @@
-- MUST apply cleanly with `git apply`.
-
-Invalid diff:
-{bad_diff}
-"""
-
-    response = client.chat.completions.create(
-        model=deployment,
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    return extract_diff(response.choices[0].message.content)
-
-
-# -----------------------------
-# Main review
-# -----------------------------
+# ---------------------------------------------------------
+# Main Review Logic
+# ---------------------------------------------------------
 def run_review():
-    files_text = read_files()
-    live_api_results = test_endpoints()
+    controller_code = read_calc_controller()
 
     prompt = f"""
-You are an expert API QA engineer.
+You are an expert .NET API engineer.
 
-Return:
-1. PASS or FAIL
-2. ONE valid unified diff patch (```diff) fixing all issues.
-3. Diff MUST be valid and apply cleanly.
-4. NO English words in hunk headers.
-5. NO multi-file diffs.
+You will receive ONE file only:
+CalcController.cs
 
-C# FILES:
-{files_text}
+Your job:
+- Identify issues in THIS file only.
+- Fix ONLY this file.
+- Produce a unified diff patch for THIS file only.
+- NO multi-file diffs.
+- NO new files.
+- NO deletions.
+- NO renames.
+- Hunk headers MUST be numeric (e.g., @@ -1,5 +1,10 @@).
+- Patch MUST apply cleanly with `git apply`.
 
-LIVE API RESPONSES:
-{live_api_results}
+===== FILE: CalcController.cs =====
+{controller_code}
 """
 
     response = client.chat.completions.create(
@@ -179,6 +112,7 @@ LIVE API RESPONSES:
     )
 
     output = response.choices[0].message.content
+    print("\n===== AI OUTPUT =====\n")
     print(output)
 
     diff = extract_diff(output)
@@ -187,25 +121,15 @@ LIVE API RESPONSES:
         print("No diff found. Failing.")
         sys.exit(1)
 
-    # Validate diff
     if not is_valid_diff(diff):
-        print("Invalid diff detected. Regenerating...")
-        diff = regenerate_diff(diff)
-
-    # Validate again
-    if not diff or not is_valid_diff(diff):
-        print("Still invalid. Failing.")
+        print("Invalid diff. Failing.")
         sys.exit(1)
 
-    # Apply patch
     if apply_patch(diff):
-        print("Patch applied.")
+        print("Patch applied successfully.")
         create_fix_branch()
     else:
         print("Patch failed to apply.")
-        sys.exit(1)
-
-    if "FAIL" in output.upper():
         sys.exit(1)
 
 
