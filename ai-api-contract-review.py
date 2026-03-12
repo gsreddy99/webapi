@@ -68,13 +68,22 @@ def test_endpoints():
 # Validate diff syntax
 # -----------------------------
 def is_valid_diff(diff):
-    for line in diff.splitlines():
+    lines = diff.splitlines()
+
+    # Must not contain multiple file diffs
+    if diff.count("diff --git") > 1:
+        return False
+
+    for line in lines:
         if line.startswith("@@"):
             # Must match @@ -a,b +c,d @@
             if not ("@@" in line and "-" in line and "+" in line and "," in line):
                 return False
-            if any(word.isalpha() for word in line):
+            # Reject ANY letters in hunk header
+            header = line.replace("@", "").replace("-", "").replace("+", "").replace(",", "").replace(" ", "")
+            if not header.isdigit():
                 return False
+
     return True
 
 
@@ -113,17 +122,20 @@ def create_fix_branch():
 
 
 # -----------------------------
-# Ask LLM for a corrected diff
+# Ask LLM for corrected diff
 # -----------------------------
 def regenerate_diff(bad_diff):
     prompt = f"""
-The previous diff was invalid. Produce ONLY a valid unified diff.
+The previous diff was INVALID.
 
-Rules:
+Produce ONLY a valid unified diff patch.
+
+STRICT RULES:
+- ONE file only.
 - NO English words in hunk headers.
 - NO placeholders.
-- ONLY valid unified diff format.
-- Must apply cleanly with `git apply`.
+- Hunk headers MUST be numeric: @@ -0,0 +1,70 @@
+- MUST apply cleanly with `git apply`.
 
 Invalid diff:
 {bad_diff}
@@ -149,9 +161,10 @@ You are an expert API QA engineer.
 
 Return:
 1. PASS or FAIL
-2. A valid unified diff patch (```diff) fixing all issues.
+2. ONE valid unified diff patch (```diff) fixing all issues.
 3. Diff MUST be valid and apply cleanly.
 4. NO English words in hunk headers.
+5. NO multi-file diffs.
 
 C# FILES:
 {files_text}
@@ -174,14 +187,17 @@ LIVE API RESPONSES:
         print("No diff found. Failing.")
         sys.exit(1)
 
+    # Validate diff
     if not is_valid_diff(diff):
         print("Invalid diff detected. Regenerating...")
         diff = regenerate_diff(diff)
 
+    # Validate again
     if not diff or not is_valid_diff(diff):
         print("Still invalid. Failing.")
         sys.exit(1)
 
+    # Apply patch
     if apply_patch(diff):
         print("Patch applied.")
         create_fix_branch()
