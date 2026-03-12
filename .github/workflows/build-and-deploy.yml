@@ -1,140 +1,121 @@
-  import os
-    import sys
-    import subprocess
-    from pathlib import Path
-    from openai import AzureOpenAI
-    
-    # ---------------------------------------------------------
-    # Azure OpenAI Client
-    # ---------------------------------------------------------
-    client = AzureOpenAI(
-    api_key=os.environ["AOAI_KEY"],
-    azure_endpoint=os.environ["AOAI_ENDPOINT"],
-    api_version="2024-12-01-preview"
-    )
-    
-    deployment = os.environ["AOAI_DEPLOYMENT"]
-    
-    # ---------------------------------------------------------
-    # The ONLY file the AI is allowed to modify
-    # ---------------------------------------------------------
-    TARGET_FILE = (Path(__file__).parent / "calculator-api" / "src" / "Controllers" / "CalcController.cs").resolve()
-    
-    print("Loading controller from:", TARGET_FILE)
-    print("Exists:", TARGET_FILE.exists())
+name: Build and Deploy to AKS
 
-                          if not TARGET_FILE.exists():
-                            print("ERROR: CalcController.cs not found. Fix the path.")
-                            sys.exit(1)
+on:
+  push:
+    branches:
+      - 'main'
+  workflow_dispatch:
 
+env:
+  REGISTRY: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+  IMAGE_NAME: webapi
+  AKS_RESOURCE_GROUP: ${{ secrets.AKS_RESOURCE_GROUP }}
+  AKS_CLUSTER_NAME: ${{ secrets.AKS_CLUSTER_NAME }}
+  NAMESPACE: webapi
 
-  # ---------------------------------------------------------
-  # Helpers
-  # ---------------------------------------------------------
-                          def read_calc_controller():
-                            return TARGET_FILE.read_text(errors="ignore")
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
 
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-                          def extract_diff(output):
-                            if "```diff" not in output:
-                              return None
-                            return output.split("```diff")[1].split("```")[0].strip()
+      # ---------------------------------------------------
+      # AI Review Step (Azure OpenAI)
+      # ---------------------------------------------------
+      - name: Install Python dependencies
+        run: pip install openai
 
+      - name: Run AI Review (Architecture + Config)
+        run: python3 ai-review.py
+        env:
+          AOAI_ENDPOINT: ${{ secrets.AOAI_ENDPOINT }}
+          AOAI_KEY: ${{ secrets.AOAI_KEY }}
+          AOAI_DEPLOYMENT: ${{ secrets.AOAI_DEPLOYMENT }}
 
-                          def is_valid_diff(diff):
-                            # Must contain exactly one diff header
-                            if diff.count("diff --git") != 1:
-                              return False
+      # ---------------------------------------------------
+      # API Behavior + Contract QA (Azure OpenAI)
+      # ---------------------------------------------------
+      - name: Run API Contract Review
+        run: python3 ai-api-contract-review.py
+        env:
+          AOAI_ENDPOINT: ${{ secrets.AOAI_ENDPOINT }}
+          AOAI_KEY: ${{ secrets.AOAI_KEY }}
+          AOAI_DEPLOYMENT: ${{ secrets.AOAI_DEPLOYMENT }}
 
-                            # Must reference EXACT file path
-                            expected = "calculator-api/src/Controllers/CalcController.cs"
-                            if expected not in diff:
-                              return False
+      # ---------------------------------------------------
+      # .NET Build + Tests + Coverage
+      # ---------------------------------------------------
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
 
-                            # Validate hunk headers
-                            for line in diff.splitlines():
-                              if line.startswith("@@"):
-                                header = line.replace("@", "").replace("-", "").replace("+", "").replace(",", "").replace(" ", "")
-                                if not header.isdigit():
-                                  return False
+      - name: Restore dependencies
+        run: dotnet restore
 
-                            return True
+      - name: Install ReportGenerator
+        run: dotnet tool install -g dotnet-reportgenerator-globaltool
 
+      - name: Add tool path
+        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
-                          def apply_patch(diff):
-                            patch_file = "ai_patch.diff"
-                            with open(patch_file, "w") as f:
-                              f.write(diff)
+      - name: Run unit + integration tests
+        run: |
+          dotnet test \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults \
+            --verbosity normal
 
-                            try:
-                              subprocess.run(["git", "apply", patch_file], check=True)
-                              return True
-                            except subprocess.CalledProcessError:
-                              return False
+      - name: Generate code coverage report
+        run: |
+          reportgenerator \
+            -reports:TestResults/**/coverage.cobertura.xml \
+            -targetdir:CoverageReport \
+            -reporttypes:Html
 
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: CoverageReport
 
-                          def create_fix_branch():
-                            subprocess.run(["git", "checkout", "-b", "fix-ai"], check=False)
-                            subprocess.run(["git", "add", "."], check=False)
-                            subprocess.run(["git", "commit", "-m", "AI auto-fix"], check=False)
-                            subprocess.run(["git", "push", "-u", "origin", "fix-ai"], check=False)
+      - name: Publish test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults
 
+  deploy-to-aks:
+    if: github.ref == 'refs/heads/main'
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
 
-  # ---------------------------------------------------------
-  # Main Review Logic
-  # ---------------------------------------------------------
-                          def run_review():
-                            controller_code = read_calc_controller()
-                            
-                            prompt = f"""
-    You are an expert .NET API engineer.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-                          You will receive ONE file only:
-    calculator-api/src/Controllers/CalcController.cs
+      # Deployment disabled (uncomment when ready)
+      # - name: Azure Login
+      #   uses: azure/login@v2
+      #   with:
+      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-                          Your job:
-                            - Identify issues in THIS file only.
-                            - Fix ONLY this file.
-                            - Produce a unified diff patch for THIS file only.
-                            - The diff MUST use this exact file path:
-                              calculator-api/src/Controllers/CalcController.cs
-                            - NO multi-file diffs.
-                            - NO new files.
-                            - NO deletions.
-                            - NO renames.
-                            - Hunk headers MUST be numeric (e.g., @@ -1,5 +1,10 @@).
-                            - Patch MUST apply cleanly with `git apply`.
+      # - name: Set AKS context
+      #   uses: azure/aks-set-context@v3
+      #   with:
+      #     resource-group: ${{ env.AKS_RESOURCE_GROUP }}
+      #     cluster-name: ${{ env.AKS_CLUSTER_NAME }}
 
-                          ===== FILE: CalcController.cs =====
-    {controller_code}
-    """
-
-    response = client.chat.completions.create(
-        model=deployment,
-        messages=[{"role": "user", "content": prompt}]
-                                           )
-                                           
-                                           output = response.choices[0].message.content
-                                           print("\n===== AI OUTPUT =====\n")
-                                           print(output)
-                                           
-                                           diff = extract_diff(output)
-
-                                           if not diff:
-                                             print("No diff found. Failing.")
-                                             sys.exit(1)
-
-                                           if not is_valid_diff(diff):
-                                             print("Invalid diff. Failing.")
-                                             sys.exit(1)
-
-                                           if apply_patch(diff):
-                                             print("Patch applied successfully.")
-                                             create_fix_branch()
-                                           else:
-                                             print("Patch failed to apply.")
-                                             sys.exit(1)
-
-
-                          if __name__ == "__main__":
-                            run_review()
+      # - name: Deploy manifests
+      #   working-directory: calculator-api/k8s
+      #   run: |
+      #     kubectl apply -n $NAMESPACE -f namespace.yaml
+      #     kubectl apply -n $NAMESPACE -f deployment.yaml
+      #     kubectl apply -n $NAMESPACE -f service.yaml
+      #     kubectl apply -n $NAMESPACE -f ingress.yaml
+      #     kubectl apply -n $NAMESPACE -f hpa.yaml
+      #     kubectl apply -n $NAMESPACE -f serviceaccount.yaml

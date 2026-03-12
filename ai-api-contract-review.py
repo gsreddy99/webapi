@@ -46,8 +46,9 @@ def is_valid_diff(diff):
     if diff.count("diff --git") != 1:
         return False
 
-    # Must reference ONLY CalcController.cs
-    if "CalcController.cs" not in diff:
+    # Must reference EXACT file path
+    expected = "calculator-api/src/Controllers/CalcController.cs"
+    if expected not in diff:
         return False
 
     # Validate hunk headers
@@ -89,12 +90,14 @@ def run_review():
 You are an expert .NET API engineer.
 
 You will receive ONE file only:
-CalcController.cs
+calculator-api/src/Controllers/CalcController.cs
 
 Your job:
 - Identify issues in THIS file only.
 - Fix ONLY this file.
 - Produce a unified diff patch for THIS file only.
+- The diff MUST use this exact file path:
+  calculator-api/src/Controllers/CalcController.cs
 - NO multi-file diffs.
 - NO new files.
 - NO deletions.
