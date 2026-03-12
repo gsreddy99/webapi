@@ -70,8 +70,8 @@ def test_endpoints():
 def is_valid_diff(diff):
     lines = diff.splitlines()
 
-    # Must not contain multiple file diffs
-    if diff.count("diff --git") > 1:
+    # Must contain exactly ONE file diff
+    if diff.count("diff --git") != 1:
         return False
 
     for line in lines:
@@ -79,7 +79,8 @@ def is_valid_diff(diff):
             # Must match @@ -a,b +c,d @@
             if not ("@@" in line and "-" in line and "+" in line and "," in line):
                 return False
-            # Reject ANY letters in hunk header
+
+            # Remove symbols and check numeric
             header = line.replace("@", "").replace("-", "").replace("+", "").replace(",", "").replace(" ", "")
             if not header.isdigit():
                 return False
@@ -93,8 +94,7 @@ def is_valid_diff(diff):
 def extract_diff(output):
     if "```diff" not in output:
         return None
-    diff = output.split("```diff")[1].split("```")[0].strip()
-    return diff
+    return output.split("```diff")[1].split("```")[0].strip()
 
 
 # -----------------------------
@@ -128,7 +128,7 @@ def regenerate_diff(bad_diff):
     prompt = f"""
 The previous diff was INVALID.
 
-Produce ONLY a valid unified diff patch.
+Produce ONLY a valid unified diff patch for ONE file.
 
 STRICT RULES:
 - ONE file only.
