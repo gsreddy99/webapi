@@ -36,6 +36,7 @@ if not TARGET_FILE.exists():
     print("ERROR: CalcController.cs not found.")
     sys.exit(1)
 
+
 # ---------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------
@@ -46,11 +47,9 @@ def read_file():
 
 def extract_diff(output: str):
 
-    # Preferred format
     if "```diff" in output:
         return output.split("```diff")[1].split("```")[0].strip()
 
-    # fallback if model skipped code block
     if "diff --git" in output:
         return output[output.index("diff --git"):].strip()
 
@@ -76,7 +75,7 @@ def is_valid_diff(diff: str):
         return False
 
     if FILE_PATH not in diff:
-        print("Patch attempts to modify unauthorized files")
+        print("Patch tries to modify unauthorized files")
         return False
 
     for line in diff.splitlines():
@@ -101,7 +100,6 @@ def apply_patch(diff):
             check=True
         )
         return True
-
     except subprocess.CalledProcessError:
         print("Patch failed to apply")
         subprocess.run(["git", "apply", "--stat", patch_file])
@@ -126,12 +124,15 @@ def commit_fix():
 
 
 # ---------------------------------------------------------
-# Main Review Logic
+# Main Review
 # ---------------------------------------------------------
 
 def run_review():
 
     code = read_file()
+
+    # safer way to embed markdown code blocks
+    fence = "```"
 
     prompt = f"""
 You are a senior .NET API architect performing an API contract review.
@@ -139,24 +140,82 @@ You are a senior .NET API architect performing an API contract review.
 File under review:
 {FILE_PATH}
 
-Your job is to fix API contract problems such as:
-
+Your job is to fix problems like:
 - missing validation
-- divide-by-zero risks
+- divide-by-zero errors
 - incorrect HTTP responses
 - unsafe error handling
-- missing logging
-- inconsistent API behavior
+- logging issues
 
-CRITICAL OUTPUT RULES
+OUTPUT RULES
 
-You MUST return ONLY a git patch.
+Return ONLY a git patch.
 
-Your entire response MUST be a single code block like:
+Format:
 
-```diff
+{fence}diff
 diff --git a/{FILE_PATH} b/{FILE_PATH}
 --- a/{FILE_PATH}
 +++ b/{FILE_PATH}
 @@ -line,line +line,line @@
-PATCH
+PATCH CONTENT
+{fence}
+
+Rules:
+- Modify ONLY this file
+- Do not create files
+- Do not rename files
+- Do not add explanations
+- Patch must apply with `git apply`
+
+If no changes are required return:
+
+{fence}diff
+diff --git a/{FILE_PATH} b/{FILE_PATH}
+--- a/{FILE_PATH}
++++ b/{FILE_PATH}
+{fence}
+
+FILE CONTENT:
+{code}
+"""
+
+    response = client.chat.completions.create(
+        model=deployment,
+        messages=[
+            {"role": "system", "content": "You are a senior .NET API engineer."},
+            {"role": "user", "content": prompt}
+        ],
+        max_completion_tokens=2000
+    )
+
+    output = response.choices[0].message.content
+
+    print("\n===== AI OUTPUT =====\n")
+    print(output)
+
+    diff = extract_diff(output)
+
+    if not diff:
+        print("No diff returned. Skipping.")
+        sys.exit(0)
+
+    diff = normalize_diff(diff)
+
+    if not is_valid_diff(diff):
+        print("Diff validation failed")
+        sys.exit(1)
+
+    if apply_patch(diff):
+        print("Patch applied successfully")
+        commit_fix()
+    else:
+        sys.exit(1)
+
+
+# ---------------------------------------------------------
+# Entry
+# ---------------------------------------------------------
+
+if __name__ == "__main__":
+    run_review()
