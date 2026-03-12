@@ -17,7 +17,7 @@ client = AzureOpenAI(
 deployment = os.environ["AOAI_DEPLOYMENT"]
 
 # ---------------------------------------------------------
-# Target file allowed for modification
+# Target file
 # ---------------------------------------------------------
 TARGET_FILE = (
     Path(__file__).parent
@@ -44,16 +44,21 @@ def read_file():
     return TARGET_FILE.read_text(errors="ignore")
 
 
-def extract_diff(output):
-    if "```diff" not in output:
-        return None
-    return output.split("```diff")[1].split("```")[0].strip()
+def extract_diff(output: str):
+
+    # Preferred format
+    if "```diff" in output:
+        return output.split("```diff")[1].split("```")[0].strip()
+
+    # fallback if model skipped code block
+    if "diff --git" in output:
+        return output[output.index("diff --git"):].strip()
+
+    return None
 
 
-def normalize_diff(diff):
-    """
-    Ensure git headers exist.
-    """
+def normalize_diff(diff: str):
+
     if not diff.startswith("diff --git"):
         header = f"""diff --git a/{FILE_PATH} b/{FILE_PATH}
 --- a/{FILE_PATH}
@@ -64,14 +69,14 @@ def normalize_diff(diff):
     return diff
 
 
-def is_valid_diff(diff):
+def is_valid_diff(diff: str):
 
     if diff.count("diff --git") != 1:
         print("Invalid diff header")
         return False
 
     if FILE_PATH not in diff:
-        print("Patch modifies unauthorized files")
+        print("Patch attempts to modify unauthorized files")
         return False
 
     for line in diff.splitlines():
@@ -134,82 +139,24 @@ You are a senior .NET API architect performing an API contract review.
 File under review:
 {FILE_PATH}
 
-Your responsibilities:
+Your job is to fix API contract problems such as:
 
-Check for:
-- invalid HTTP behavior
 - missing validation
-- unsafe API responses
-- divide-by-zero cases
-- incorrect status codes
-- logging issues
+- divide-by-zero risks
+- incorrect HTTP responses
+- unsafe error handling
+- missing logging
+- inconsistent API behavior
 
-You may ONLY modify this file.
+CRITICAL OUTPUT RULES
 
-CRITICAL OUTPUT RULES:
+You MUST return ONLY a git patch.
 
-You MUST return a valid git unified diff.
+Your entire response MUST be a single code block like:
 
-Patch must begin with:
-
+```diff
 diff --git a/{FILE_PATH} b/{FILE_PATH}
 --- a/{FILE_PATH}
 +++ b/{FILE_PATH}
-
-Rules:
-- Modify ONLY this file
-- Exactly ONE diff
-- No explanations
-- No additional text
-- Output ONLY a ```diff block
-- Patch must apply with `git apply`
-
-FILE CONTENT:
-{code}
-"""
-
-    response = client.chat.completions.create(
-        model=deployment,
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a senior .NET API engineer."
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        max_completion_tokens=2000
-    )
-
-    output = response.choices[0].message.content
-
-    print("\n===== AI OUTPUT =====\n")
-    print(output)
-
-    diff = extract_diff(output)
-
-    if not diff:
-        print("No diff returned by AI")
-        sys.exit(1)
-
-    diff = normalize_diff(diff)
-
-    if not is_valid_diff(diff):
-        print("Diff validation failed")
-        sys.exit(1)
-
-    if apply_patch(diff):
-        print("Patch applied successfully")
-        commit_fix()
-    else:
-        sys.exit(1)
-
-
-# ---------------------------------------------------------
-# Entry
-# ---------------------------------------------------------
-
-if __name__ == "__main__":
-    run_review()
+@@ -line,line +line,line @@
+PATCH
