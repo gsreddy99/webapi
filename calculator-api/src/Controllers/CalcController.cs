@@ -1,57 +1,122 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using System.Globalization;
+import os
+import sys
+import subprocess
+from pathlib import Path
+from openai import AzureOpenAI
 
-namespace WebApi.Controllers
-{
-    [ApiController]
-    [Route("api/[controller]")]
-    public class SalesController : ControllerBase
-    {
-        private readonly ILogger<SalesController> _logger;
+# Azure OpenAI client
+client = AzureOpenAI(
+    api_key=os.environ["AOAI_KEY"],
+    azure_endpoint=os.environ["AOAI_ENDPOINT"],
+    api_version="2024-12-01-preview"
+)
 
-        public SalesController(ILogger<SalesController> logger)
-        {
-            _logger = logger;
-        }
+deployment = os.environ["AOAI_DEPLOYMENT"]
 
-        /// <summary>
-        /// Returns a deterministic sales summary for a given date.
-        /// </summary>
-        /// <param name="date">Date in YYYY-MM-DD format.</param>
-        /// <returns>Sales amount for the given date.</returns>
-        [HttpGet("summary")]
-        public IActionResult GetSalesSummary([FromQuery] string date)
-        {
-            _logger.LogInformation("Received sales summary request for date={Date}", date);
+# The ONLY file the AI is allowed to modify
+TARGET_FILE = Path("calculator-api/src/Controllers/CalcController.cs")
 
-            if (string.IsNullOrWhiteSpace(date))
-            {
-                _logger.LogWarning("Missing required 'date' query parameter.");
-                return BadRequest(new { error = "Query parameter 'date' is required in YYYY-MM-DD format." });
-            }
 
-            if (!DateTime.TryParse(date, out var parsedDate))
-            {
-                _logger.LogWarning("Invalid date format received: {Date}", date);
-                return BadRequest(new { error = "Invalid date format. Use YYYY-MM-DD." });
-            }
+def read_calc_controller():
+    if not TARGET_FILE.exists():
+        print(f"ERROR: {TARGET_FILE} not found.")
+        sys.exit(1)
+    return TARGET_FILE.read_text()
 
-            string normalizedDate = parsedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-            int year = parsedDate.Year;
-            int month = parsedDate.Month;
-            int day = parsedDate.Day;
+def extract_diff(output):
+    if "```diff" not in output:
+        return None
+    return output.split("```diff")[1].split("```")[0].strip()
 
-            double amount = ((year * month * day) % 5000) + 500;
 
-            _logger.LogInformation("Sales summary for {Date}: {Amount}", normalizedDate, amount);
+def is_valid_diff(diff):
+    # Must contain exactly one diff header
+    if diff.count("diff --git") != 1:
+        return False
 
-            return Ok(new
-            {
-                date = normalizedDate,
-                amount
-            });
-        }
-    }
-}
+    # Must reference ONLY the target file
+    if TARGET_FILE.name not in diff:
+        return False
+
+    # Validate hunk headers
+    for line in diff.splitlines():
+        if line.startswith("@@"):
+            header = line.replace("@", "").replace("-", "").replace("+", "").replace(",", "").replace(" ", "")
+            if not header.isdigit():
+                return False
+
+    return True
+
+
+def apply_patch(diff):
+    patch_file = "ai_patch.diff"
+    with open(patch_file, "w") as f:
+        f.write(diff)
+
+    try:
+        subprocess.run(["git", "apply", patch_file], check=True)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def create_fix_branch():
+    subprocess.run(["git", "checkout", "-b", "fix-ai"], check=False)
+    subprocess.run(["git", "add", "."], check=False)
+    subprocess.run(["git", "commit", "-m", "AI auto-fix"], check=False)
+    subprocess.run(["git", "push", "-u", "origin", "fix-ai"], check=False)
+
+
+def run_review():
+    controller_code = read_calc_controller()
+
+    prompt = f"""
+You are an expert .NET API engineer.
+
+You will receive ONE file only:
+CalcController.cs
+
+Your job:
+- Identify issues in THIS file only.
+- Fix ONLY this file.
+- Produce a unified diff patch for THIS file only.
+- NO multi-file diffs.
+- NO new files.
+- NO deletions.
+- NO renames.
+- Hunk headers MUST be numeric (e.g., @@ -1,5 +1,10 @@).
+- Patch MUST apply cleanly with `git apply`.
+
+===== FILE: CalcController.cs =====
+{controller_code}
+"""
+
+    response = client.chat.completions.create(
+        model=deployment,
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    output = response.choices[0].message.content
+    print(output)
+
+    diff = extract_diff(output)
+
+    if not diff:
+        print("No diff found. Failing.")
+        sys.exit(1)
+
+    if not is_valid_diff(diff):
+        print("Invalid diff. Failing.")
+        sys.exit(1)
+
+    if apply_patch(diff):
+        print("Patch applied.")
+        create_fix_branch()
+    else:
+        print("Patch failed to apply.")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    run_review()
